@@ -1,0 +1,1077 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum RoleCode {
+  ADMIN
+  EMPLOYEE
+  CUSTOMER
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum DriverStatus {
+  PENDING_APPROVAL
+  ACTIVE
+  INACTIVE
+  REJECTED
+}
+
+enum DriverAvailability {
+  AVAILABLE
+  UNAVAILABLE
+  OFFLINE
+}
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum VehicleStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+  RETIRED
+}
+
+enum VehicleDocumentType {
+  REGISTRATION
+  INSURANCE
+  PERMIT
+  FITNESS
+  POLLUTION
+  OTHER
+}
+
+enum DriverDocumentType {
+  DRIVING_LICENSE
+  IDENTITY
+  MEDICAL_CERTIFICATE
+  OTHER
+}
+
+enum DocumentStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+enum RideStatus {
+  REQUESTED
+  MATCHING
+  OFFERED
+  ACCEPTED
+  DRIVER_ARRIVING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
+enum RideRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+  EXPIRED
+}
+
+enum RideParticipantStatus {
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum RideOfferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum NotificationType {
+  RIDE_UPDATE
+  DRIVER_OFFER
+  CANCELLATION
+  PAYMENT_EVENT
+  ACCOUNT_EVENT
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  PUSH
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+}
+
+enum NotificationDevicePlatform {
+  ANDROID
+  IOS
+  WEB
+}
+
+enum WalletTransactionType {
+  CREDIT
+  DEBIT
+  REFUND
+}
+
+enum WalletTransactionDirection {
+  CREDIT
+  DEBIT
+}
+
+enum WalletTransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REVERSED
+}
+
+enum PaymentStatus {
+  CREATED
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  PARTIALLY_REFUNDED
+  REFUNDED
+}
+
+enum PaymentWebhookStatus {
+  RECEIVED
+  PROCESSED
+  IGNORED
+  FAILED
+}
+
+enum PaymentRefundStatus {
+  REQUESTED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum RatingDirection {
+  CUSTOMER_TO_DRIVER
+  DRIVER_TO_CUSTOMER
+}
+
+enum RatingStatus {
+  PUBLISHED
+  REPORTED
+  HIDDEN
+}
+
+enum RatingReportStatus {
+  OPEN
+  REVIEWED
+  DISMISSED
+}
+
+enum RecurringRideStatus {
+  ACTIVE
+  CANCELLED
+  COMPLETED
+}
+
+enum RecurringRideOccurrenceStatus {
+  PENDING
+  GENERATING
+  GENERATED
+  FAILED
+  CANCELLED
+}
+
+enum IdentityVerificationStatus {
+  REQUESTED
+  PENDING
+  VERIFIED
+  REJECTED
+  FAILED
+}
+
+enum CallDirection {
+  CUSTOMER_TO_DRIVER
+  DRIVER_TO_CUSTOMER
+}
+
+enum CallStatus {
+  REQUESTED
+  INITIATING
+  RINGING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum LoyaltyEarningBasis {
+  FIXED
+  PER_CURRENCY_UNIT
+}
+
+enum LoyaltyTransactionType {
+  EARN
+  REDEEM
+  ADJUSTMENT
+  REVERSAL
+}
+
+enum LoyaltyTransactionDirection {
+  CREDIT
+  DEBIT
+}
+
+enum LoyaltyTransactionStatus {
+  COMPLETED
+  FAILED
+  REVERSED
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  email        String     @unique
+  passwordHash String
+  displayName  String?
+  phoneNumber  String?
+  status       UserStatus @default(ACTIVE)
+  deletedAt    DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  roles          UserRole[]
+  employee       Employee?
+  customer       Customer?
+  auditLogs      AuditLog[]
+  createdVehicleDocuments VehicleDocument[] @relation("VehicleDocumentCreatedBy")
+  createdDriverDocuments  DriverDocument[]  @relation("DriverDocumentCreatedBy")
+  verifiedVehicleDocuments VehicleDocument[] @relation("VehicleDocumentVerifiedBy")
+  verifiedDriverDocuments  DriverDocument[]  @relation("DriverDocumentVerifiedBy")
+  refreshTokens           RefreshToken[]
+  passwordResetTokens     PasswordResetToken[]
+  reviewedEmployees       Employee[]          @relation("EmployeeDriverReviewer")
+  cancelledRides          Ride[]              @relation("RideCancelledBy")
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
+  notificationDevices      NotificationDevice[]
+  wallet                    Wallet?
+  payments                  Payment[]
+  ratingsGiven              Rating[]            @relation("RatingsGiven")
+  ratingsReceived           Rating[]            @relation("RatingsReceived")
+  ratingReports             RatingReport[]
+  identityVerifications    IdentityVerification[]
+  chatParticipants         ChatParticipant[]
+  chatMessages             ChatMessage[]
+  chatMessageReads         ChatMessageRead[]
+  callsInitiated           MaskedCall[]        @relation("CallCaller")
+  callsReceived            MaskedCall[]        @relation("CallCallee")
+  loyaltyAccount           LoyaltyAccount?
+
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model Role {
+  id        String     @id @default(uuid()) @db.Uuid
+  code      RoleCode   @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  users UserRole[]
+}
+
+model UserRole {
+  userId     String   @db.Uuid
+  roleId     String   @db.Uuid
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}
+
+model Employee {
+  id             String         @id @default(uuid()) @db.Uuid
+  userId         String         @unique @db.Uuid
+  employeeCode   String         @unique
+  status         EmployeeStatus @default(ACTIVE)
+  driverStatus   DriverStatus   @default(PENDING_APPROVAL)
+  availability   DriverAvailability @default(OFFLINE)
+  driverDecisionAt DateTime?
+  driverDecisionNote String?
+  driverReviewedById String?     @db.Uuid
+  deletedAt      DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  driverReviewedBy User?          @relation("EmployeeDriverReviewer", fields: [driverReviewedById], references: [id], onDelete: SetNull)
+  driverDocuments DriverDocument[]
+  vehicles        Vehicle[]
+  rides           Ride[]
+  locationHistory DriverLocationHistory[]
+  rideOffers      RideOffer[]
+
+  @@index([status])
+  @@index([driverStatus])
+  @@index([availability])
+  @@index([deletedAt])
+}
+
+model DriverLocationHistory {
+  id         String   @id @default(uuid()) @db.Uuid
+  employeeId String   @db.Uuid
+  latitude   Decimal  @db.Decimal(9, 6)
+  longitude  Decimal  @db.Decimal(9, 6)
+  recordedAt DateTime
+  createdAt  DateTime @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, recordedAt])
+  @@index([recordedAt])
+}
+
+model Customer {
+  id                String         @id @default(uuid()) @db.Uuid
+  userId            String         @unique @db.Uuid
+  preferredSettings Json?
+  status            CustomerStatus @default(ACTIVE)
+  deletedAt         DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  savedLocations SavedLocation[]
+  requestedRides  Ride[]
+  rideRequests    RideRequest[]
+  rideParticipants RideParticipant[]
+  recurringRides   RecurringRide[]
+
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model SavedLocation {
+  id         String   @id @default(uuid()) @db.Uuid
+  customerId String   @db.Uuid
+  label      String
+  address    String
+  latitude   Decimal  @db.Decimal(9, 6)
+  longitude  Decimal  @db.Decimal(9, 6)
+  placeId    String?
+  deletedAt  DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, deletedAt])
+}
+
+model Vehicle {
+  id                 String        @id @default(uuid()) @db.Uuid
+  registrationNumber String        @unique
+  capacity           Int
+  make               String?
+  model              String?
+  metadata           Json?
+  status             VehicleStatus @default(ACTIVE)
+  assignedEmployeeId String?       @db.Uuid
+  deletedAt          DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  documents VehicleDocument[]
+  assignedEmployee Employee? @relation(fields: [assignedEmployeeId], references: [id], onDelete: SetNull)
+  rides           Ride[]
+  rideOffers      RideOffer[]
+
+  @@index([status])
+  @@index([assignedEmployeeId])
+  @@index([deletedAt])
+}
+
+model Ride {
+  id                   String     @id @default(uuid()) @db.Uuid
+  requestedByCustomerId String    @db.Uuid
+  driverId             String?    @db.Uuid
+  vehicleId            String?    @db.Uuid
+  pickupAddress        String
+  pickupLatitude       Decimal    @db.Decimal(9, 6)
+  pickupLongitude      Decimal    @db.Decimal(9, 6)
+  pickupPlaceId        String?
+  destinationAddress   String
+  destinationLatitude  Decimal    @db.Decimal(9, 6)
+  destinationLongitude Decimal    @db.Decimal(9, 6)
+  destinationPlaceId   String?
+  scheduledAt          DateTime
+  status               RideStatus @default(REQUESTED)
+  seatCapacity         Int
+  estimatedFare        Decimal?   @db.Decimal(12, 2)
+  finalFare            Decimal?   @db.Decimal(12, 2)
+  currency             String     @default("INR")
+  startedAt            DateTime?
+  completedAt          DateTime?
+  cancelledAt          DateTime?
+  cancelledByUserId    String?    @db.Uuid
+  cancellationReason   String?
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  requestedByCustomer Customer         @relation(fields: [requestedByCustomerId], references: [id], onDelete: Restrict)
+  driver              Employee?       @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  vehicle             Vehicle?        @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  cancelledBy         User?           @relation("RideCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: SetNull)
+  requests            RideRequest[]
+  participants        RideParticipant[]
+  offers              RideOffer[]
+  ratings             Rating[]
+  recurringRideId     String?              @db.Uuid
+  recurringRide       RecurringRide?       @relation(fields: [recurringRideId], references: [id], onDelete: SetNull)
+  recurringOccurrence RecurringRideOccurrence?
+  chatConversation    ChatConversation?
+  maskedCalls         MaskedCall[]
+
+  @@index([requestedByCustomerId, createdAt])
+  @@index([driverId, status])
+  @@index([vehicleId])
+  @@index([status, scheduledAt])
+  @@index([completedAt])
+  @@index([cancelledAt])
+  @@index([recurringRideId, scheduledAt])
+}
+
+model RideRequest {
+  id            String            @id @default(uuid()) @db.Uuid
+  rideId        String            @db.Uuid
+  customerId    String            @db.Uuid
+  idempotencyKey String           @default(uuid())
+  seatsRequested Int
+  status        RideRequestStatus @default(PENDING)
+  respondedAt   DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  ride     Ride     @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  @@unique([rideId, customerId])
+  @@unique([customerId, idempotencyKey])
+  @@index([customerId, status])
+  @@index([rideId, status])
+}
+
+model RideParticipant {
+  id         String                @id @default(uuid()) @db.Uuid
+  rideId     String                @db.Uuid
+  customerId String                @db.Uuid
+  seats      Int
+  status     RideParticipantStatus @default(CONFIRMED)
+  joinedAt   DateTime              @default(now())
+  leftAt     DateTime?
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+
+  ride     Ride     @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  @@unique([rideId, customerId])
+  @@index([rideId, status])
+  @@index([customerId, status])
+}
+
+model RideOffer {
+  id                  String          @id @default(uuid()) @db.Uuid
+  rideId              String          @db.Uuid
+  driverId            String          @db.Uuid
+  vehicleId           String          @db.Uuid
+  score               Decimal         @db.Decimal(12, 4)
+  distanceMeters      Int
+  etaSeconds          Int
+  routeDistanceMeters Int
+  status              RideOfferStatus @default(PENDING)
+  expiresAt           DateTime
+  respondedAt         DateTime?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  ride    Ride     @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  driver  Employee @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+
+  @@unique([rideId, driverId])
+  @@index([driverId, status])
+  @@index([status, expiresAt])
+  @@index([rideId, createdAt])
+  @@index([createdAt])
+}
+
+model VehicleDocument {
+  id             String             @id @default(uuid()) @db.Uuid
+  vehicleId      String             @db.Uuid
+  documentType   VehicleDocumentType
+  storageKey     String
+  status         DocumentStatus     @default(PENDING)
+  fileName       String?
+  contentType    String?
+  sizeBytes      Int?
+  uploadedAt     DateTime?
+  expiresAt      DateTime?
+  rejectionReason String?
+  verifiedAt     DateTime?
+  createdById    String?            @db.Uuid
+  verifiedById   String?            @db.Uuid
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation("VehicleDocumentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  verifiedBy User?  @relation("VehicleDocumentVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+
+  @@unique([vehicleId, documentType])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model DriverDocument {
+  id             String            @id @default(uuid()) @db.Uuid
+  employeeId     String            @db.Uuid
+  documentType   DriverDocumentType
+  storageKey     String
+  status         DocumentStatus    @default(PENDING)
+  fileName       String?
+  contentType    String?
+  sizeBytes      Int?
+  uploadedAt     DateTime?
+  expiresAt      DateTime?
+  rejectionReason String?
+  verifiedAt     DateTime?
+  createdById    String?           @db.Uuid
+  verifiedById   String?            @db.Uuid
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  employee  Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  createdBy User?    @relation("DriverDocumentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  verifiedBy User?   @relation("DriverDocumentVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+
+  @@unique([employeeId, documentType])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  actorUserId String?  @db.Uuid
+  entityType  String
+  entityId    String
+  action      String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  actor User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usedAt])
+  @@index([expiresAt])
+}
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @db.Uuid
+  type      NotificationType
+  title     String
+  body      String
+  data      Json?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  user       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries NotificationDelivery[]
+
+  @@index([userId, readAt, createdAt])
+  @@index([type, createdAt])
+}
+
+model NotificationDelivery {
+  id                String                   @id @default(uuid()) @db.Uuid
+  notificationId    String                   @db.Uuid
+  channel           NotificationChannel
+  status            NotificationDeliveryStatus @default(PENDING)
+  attempts          Int                      @default(0)
+  providerMessageId String?
+  lastError         String?
+  sentAt            DateTime?
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, channel])
+  @@index([status, channel, createdAt])
+}
+
+model NotificationPreference {
+  id        String              @id @default(uuid()) @db.Uuid
+  userId    String              @db.Uuid
+  type      NotificationType
+  channel   NotificationChannel
+  enabled   Boolean             @default(true)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type, channel])
+  @@index([userId, enabled])
+}
+
+model NotificationDevice {
+  id         String                    @id @default(uuid()) @db.Uuid
+  userId     String                    @db.Uuid
+  token      String                    @unique
+  platform   NotificationDevicePlatform
+  active     Boolean                   @default(true)
+  lastSeenAt DateTime                  @default(now())
+  createdAt  DateTime                  @default(now())
+  updatedAt  DateTime                  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, active])
+}
+
+model Wallet {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @unique @db.Uuid
+  currency  String   @default("INR")
+  balance   Decimal  @default(0) @db.Decimal(12, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions WalletTransaction[]
+
+  @@index([currency])
+}
+
+model WalletTransaction {
+  id                    String                    @id @default(uuid()) @db.Uuid
+  walletId              String                    @db.Uuid
+  type                  WalletTransactionType
+  direction             WalletTransactionDirection
+  status                WalletTransactionStatus   @default(COMPLETED)
+  amount                Decimal                   @db.Decimal(12, 2)
+  currency              String
+  idempotencyKey        String
+  referenceId           String
+  balanceAfter          Decimal                   @db.Decimal(12, 2)
+  refundOfTransactionId String?                   @unique @db.Uuid
+  metadata              Json?
+  createdAt             DateTime                  @default(now())
+
+  wallet      Wallet             @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  refundOf    WalletTransaction? @relation("WalletRefund", fields: [refundOfTransactionId], references: [id], onDelete: Restrict)
+  refunds     WalletTransaction[] @relation("WalletRefund")
+
+  @@unique([walletId, idempotencyKey])
+  @@unique([walletId, type, referenceId])
+  @@index([walletId, createdAt])
+  @@index([walletId, status, createdAt])
+  @@index([referenceId])
+}
+
+model Payment {
+  id                String        @id @default(uuid()) @db.Uuid
+  userId            String        @db.Uuid
+  provider          String        @default("RAZORPAY")
+  providerOrderId   String?       @unique
+  providerPaymentId String?       @unique
+  amount            Decimal       @db.Decimal(12, 2)
+  currency          String
+  referenceId       String
+  idempotencyKey    String
+  status            PaymentStatus @default(CREATED)
+  failureCode       String?
+  failureMessage    String?
+  verifiedAt        DateTime?
+  paidAt            DateTime?
+  metadata          Json?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  user           User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
+  refunds        PaymentRefund[]
+  webhookEvents  PaymentWebhookEvent[]
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, createdAt])
+  @@index([userId, status, createdAt])
+  @@index([referenceId])
+  @@index([status, paidAt])
+}
+
+model PaymentRefund {
+  id                String             @id @default(uuid()) @db.Uuid
+  paymentId         String             @db.Uuid
+  providerRefundId  String?            @unique
+  amount            Decimal            @db.Decimal(12, 2)
+  currency          String
+  idempotencyKey    String
+  status            PaymentRefundStatus @default(REQUESTED)
+  reason            String?
+  failureMessage    String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@unique([paymentId, idempotencyKey])
+  @@index([paymentId, status, createdAt])
+  @@index([status, createdAt])
+}
+
+model PaymentWebhookEvent {
+  id               String              @id @default(uuid()) @db.Uuid
+  provider         String              @default("RAZORPAY")
+  providerEventId  String              @unique
+  eventType        String
+  paymentId        String?             @db.Uuid
+  payload          Json
+  status           PaymentWebhookStatus @default(RECEIVED)
+  errorMessage     String?
+  processedAt      DateTime?
+  createdAt        DateTime            @default(now())
+
+  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@index([paymentId, createdAt])
+  @@index([status, createdAt])
+}
+
+model Rating {
+  id             String         @id @default(uuid()) @db.Uuid
+  rideId         String         @db.Uuid
+  raterUserId    String         @db.Uuid
+  ratedUserId    String         @db.Uuid
+  direction      RatingDirection
+  score          Int
+  reviewText     String?
+  status         RatingStatus   @default(PUBLISHED)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  ride       Ride          @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  rater      User          @relation("RatingsGiven", fields: [raterUserId], references: [id], onDelete: Restrict)
+  rated      User          @relation("RatingsReceived", fields: [ratedUserId], references: [id], onDelete: Restrict)
+  reports    RatingReport[]
+
+  @@unique([rideId, raterUserId, ratedUserId])
+  @@index([ratedUserId, status, createdAt])
+  @@index([rideId, createdAt])
+  @@index([status, createdAt])
+}
+
+model RatingReport {
+  id           String             @id @default(uuid()) @db.Uuid
+  ratingId     String             @db.Uuid
+  reporterUserId String           @db.Uuid
+  reason       String
+  status       RatingReportStatus @default(OPEN)
+  reviewedAt   DateTime?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  rating   Rating @relation(fields: [ratingId], references: [id], onDelete: Cascade)
+  reporter User   @relation(fields: [reporterUserId], references: [id], onDelete: Restrict)
+
+  @@unique([ratingId, reporterUserId])
+  @@index([status, createdAt])
+}
+
+model RecurringRide {
+  id                   String              @id @default(uuid()) @db.Uuid
+  customerId           String              @db.Uuid
+  pickupAddress        String
+  pickupLatitude       Decimal             @db.Decimal(9, 6)
+  pickupLongitude      Decimal             @db.Decimal(9, 6)
+  pickupPlaceId        String?
+  destinationAddress   String
+  destinationLatitude  Decimal             @db.Decimal(9, 6)
+  destinationLongitude Decimal             @db.Decimal(9, 6)
+  destinationPlaceId   String?
+  scheduledTime        String
+  timeZone             String              @default("UTC")
+  daysOfWeek           Int[]
+  startDate            DateTime
+  endDate              DateTime
+  seatsRequested       Int
+  estimatedFare        Decimal?            @db.Decimal(12, 2)
+  currency             String              @default("INR")
+  status               RecurringRideStatus @default(ACTIVE)
+  cancelledAt          DateTime?
+  cancellationReason   String?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  customer    Customer                  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  rides       Ride[]
+  occurrences RecurringRideOccurrence[]
+
+  @@index([customerId, status])
+  @@index([status, startDate, endDate])
+}
+
+model RecurringRideOccurrence {
+  id              String                         @id @default(uuid()) @db.Uuid
+  recurringRideId String                         @db.Uuid
+  scheduledAt     DateTime
+  status          RecurringRideOccurrenceStatus @default(PENDING)
+  rideId          String?                        @unique @db.Uuid
+  attempts        Int                            @default(0)
+  lastError       String?
+  generatedAt     DateTime?
+  createdAt       DateTime                       @default(now())
+  updatedAt       DateTime                       @updatedAt
+
+  recurringRide RecurringRide @relation(fields: [recurringRideId], references: [id], onDelete: Cascade)
+  ride          Ride?         @relation(fields: [rideId], references: [id], onDelete: SetNull)
+
+  @@unique([recurringRideId, scheduledAt])
+  @@index([status, scheduledAt])
+  @@index([status, generatedAt])
+}
+
+model IdentityVerification {
+  id               String                    @id @default(uuid()) @db.Uuid
+  userId           String                    @db.Uuid
+  provider         String
+  providerReference String?                   @unique
+  status           IdentityVerificationStatus @default(REQUESTED)
+  requestedAt      DateTime                  @default(now())
+  completedAt      DateTime?
+  rejectionReason  String?
+  failureReason    String?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, createdAt])
+  @@index([providerReference])
+}
+
+model ChatConversation {
+  id        String   @id @default(uuid()) @db.Uuid
+  rideId    String   @unique @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ride         Ride            @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  participants ChatParticipant[]
+  messages     ChatMessage[]
+
+  @@index([updatedAt])
+}
+
+model ChatParticipant {
+  id             String   @id @default(uuid()) @db.Uuid
+  conversationId String   @db.Uuid
+  userId         String   @db.Uuid
+  joinedAt       DateTime @default(now())
+  lastReadAt     DateTime?
+
+  conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId, joinedAt])
+}
+
+model ChatMessage {
+  id             String   @id @default(uuid()) @db.Uuid
+  conversationId String   @db.Uuid
+  senderUserId   String   @db.Uuid
+  body           String
+  createdAt      DateTime @default(now())
+
+  conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User             @relation(fields: [senderUserId], references: [id], onDelete: Restrict)
+  reads        ChatMessageRead[]
+
+  @@index([conversationId, createdAt])
+  @@index([senderUserId, createdAt])
+}
+
+model ChatMessageRead {
+  id        String   @id @default(uuid()) @db.Uuid
+  messageId String   @db.Uuid
+  userId    String   @db.Uuid
+  readAt    DateTime @default(now())
+
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([userId, readAt])
+}
+
+model MaskedCall {
+  id                String        @id @default(uuid()) @db.Uuid
+  rideId            String        @db.Uuid
+  callerUserId      String        @db.Uuid
+  calleeUserId      String        @db.Uuid
+  direction         CallDirection
+  provider          String        @default("EXOTEL")
+  providerReference String?       @unique
+  idempotencyKey    String
+  status            CallStatus    @default(REQUESTED)
+  failureReason     String?
+  startedAt         DateTime?
+  answeredAt        DateTime?
+  endedAt           DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  ride   Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  caller User @relation("CallCaller", fields: [callerUserId], references: [id], onDelete: Restrict)
+  callee User @relation("CallCallee", fields: [calleeUserId], references: [id], onDelete: Restrict)
+
+  @@unique([rideId, callerUserId, idempotencyKey])
+  @@index([rideId, createdAt])
+  @@index([callerUserId, createdAt])
+  @@index([calleeUserId, createdAt])
+  @@index([status, createdAt])
+}
+
+model LoyaltyAccount {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @unique @db.Uuid
+  pointsBalance   Int      @default(0)
+  lifetimeEarned  Int      @default(0)
+  lifetimeRedeemed Int     @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions LoyaltyTransaction[]
+
+  @@index([pointsBalance])
+}
+
+model LoyaltyEarningRule {
+  id              String             @id @default(uuid()) @db.Uuid
+  code            String             @unique
+  name            String
+  basis           LoyaltyEarningBasis
+  fixedPoints     Int?
+  pointsPerUnit   Decimal?           @db.Decimal(12, 4)
+  minimumAmount   Decimal?           @db.Decimal(12, 2)
+  maximumPoints   Int?
+  active          Boolean            @default(true)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  transactions LoyaltyTransaction[]
+
+  @@index([active, code])
+}
+
+model LoyaltyRedemptionRule {
+  id                 String   @id @default(uuid()) @db.Uuid
+  code               String   @unique
+  name               String
+  pointsPerUnit      Int
+  valueMinorPerUnit  Int
+  currency           String   @default("INR")
+  minimumPoints      Int
+  maximumPoints      Int?
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  transactions LoyaltyTransaction[]
+
+  @@index([active, code])
+}
+
+model LoyaltyTransaction {
+  id                    String                      @id @default(uuid()) @db.Uuid
+  accountId             String                      @db.Uuid
+  type                  LoyaltyTransactionType
+  direction             LoyaltyTransactionDirection
+  status                LoyaltyTransactionStatus    @default(COMPLETED)
+  points                Int
+  balanceAfter          Int
+  idempotencyKey        String
+  referenceId           String
+  earningRuleId         String?                     @db.Uuid
+  redemptionRuleId      String?                     @db.Uuid
+  redemptionValueMinor  Int?
+  currency              String?
+  metadata              Json?
+  createdAt             DateTime                    @default(now())
+
+  account        LoyaltyAccount        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  earningRule    LoyaltyEarningRule?   @relation(fields: [earningRuleId], references: [id], onDelete: SetNull)
+  redemptionRule LoyaltyRedemptionRule? @relation(fields: [redemptionRuleId], references: [id], onDelete: SetNull)
+
+  @@unique([accountId, idempotencyKey])
+  @@index([accountId, createdAt])
+  @@index([referenceId, type])
+  @@index([status, createdAt])
+}
