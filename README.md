@@ -1,5 +1,7 @@
 # Enterprise Carpooling Platform
 
+Repository name: `carpooling`
+
 This repository is a database-backed modular monolith. The frontend is Next.js and TypeScript; the backend is NestJS and TypeScript. PostgreSQL/PostGIS is the authoritative store, while Redis is used for temporary cache, realtime coordination, and BullMQ jobs.
 
 ## Prerequisites
